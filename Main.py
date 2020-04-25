@@ -10,7 +10,6 @@ from sklearn.model_selection import train_test_split
 from sklearn.metrics import confusion_matrix
 from enum import Enum
 import itertools
-from keras import backend as K
 
 
 class TestSet(Enum):
@@ -18,31 +17,13 @@ class TestSet(Enum):
     CIFAR100 = 2
 
 
-CIFAR10_CLASSES = ["airplane", "automobile", "bird", "cat", "deer", "dog", "frog", "horse", "ship", "truck"]
-CIFAR100_CLASSES = [
-    'apple', 'aquarium_fish', 'baby', 'bear', 'beaver', 'bed', 'bee', 'beetle',
-    'bicycle', 'bottle', 'bowl', 'boy', 'bridge', 'bus', 'butterfly', 'camel',
-    'can', 'castle', 'caterpillar', 'cattle', 'chair', 'chimpanzee', 'clock',
-    'cloud', 'cockroach', 'couch', 'crab', 'crocodile', 'cup', 'dinosaur',
-    'dolphin', 'elephant', 'flatfish', 'forest', 'fox', 'girl', 'hamster',
-    'house', 'kangaroo', 'keyboard', 'lamp', 'lawn_mower', 'leopard', 'lion',
-    'lizard', 'lobster', 'man', 'maple_tree', 'motorcycle', 'mountain', 'mouse',
-    'mushroom', 'oak_tree', 'orange', 'orchid', 'otter', 'palm_tree', 'pear',
-    'pickup_truck', 'pine_tree', 'plain', 'plate', 'poppy', 'porcupine',
-    'possum', 'rabbit', 'raccoon', 'ray', 'road', 'rocket', 'rose',
-    'sea', 'seal', 'shark', 'shrew', 'skunk', 'skyscraper', 'snail', 'snake',
-    'spider', 'squirrel', 'streetcar', 'sunflower', 'sweet_pepper', 'table',
-    'tank', 'telephone', 'television', 'tiger', 'tractor', 'train', 'trout',
-    'tulip', 'turtle', 'wardrobe', 'whale', 'willow_tree', 'wolf', 'woman',
-    'worm'
-]
-
-INIT_LR = 1e-3  # initial learning rate
+CHOSEN_SET = TestSet.CIFAR100
+USE_GENERATOR = True
+VALIDATION_SPLIT = 0.2
 BATCH_SIZE = 32
 EPOCHS = 2
-VALIDATION_SPLIT = 0.2
-USE_GENERATOR = True
-SET = TestSet.CIFAR100
+
+INIT_LR = 1e-3
 
 
 def get_num_classes(test_set):
@@ -61,9 +42,24 @@ def get_dataset(test_set):
 
 def get_labels(test_set):
     if test_set is TestSet.CIFAR10:
-        return CIFAR10_CLASSES
+        return ["airplane", "automobile", "bird", "cat", "deer", "dog", "frog", "horse", "ship", "truck"]
     if test_set is TestSet.CIFAR100:
-        return CIFAR100_CLASSES
+        return [
+            'apple', 'aquarium_fish', 'baby', 'bear', 'beaver', 'bed', 'bee', 'beetle',
+            'bicycle', 'bottle', 'bowl', 'boy', 'bridge', 'bus', 'butterfly', 'camel',
+            'can', 'castle', 'caterpillar', 'cattle', 'chair', 'chimpanzee', 'clock',
+            'cloud', 'cockroach', 'couch', 'crab', 'crocodile', 'cup', 'dinosaur',
+            'dolphin', 'elephant', 'flatfish', 'forest', 'fox', 'girl', 'hamster',
+            'house', 'kangaroo', 'keyboard', 'lamp', 'lawn_mower', 'leopard', 'lion',
+            'lizard', 'lobster', 'man', 'maple_tree', 'motorcycle', 'mountain', 'mouse',
+            'mushroom', 'oak_tree', 'orange', 'orchid', 'otter', 'palm_tree', 'pear',
+            'pickup_truck', 'pine_tree', 'plain', 'plate', 'poppy', 'porcupine',
+            'possum', 'rabbit', 'raccoon', 'ray', 'road', 'rocket', 'rose',
+            'sea', 'seal', 'shark', 'shrew', 'skunk', 'skyscraper', 'snail', 'snake',
+            'spider', 'squirrel', 'streetcar', 'sunflower', 'sweet_pepper', 'table',
+            'tank', 'telephone', 'television', 'tiger', 'tractor', 'train', 'trout',
+            'tulip', 'turtle', 'wardrobe', 'whale', 'willow_tree', 'wolf', 'woman',
+            'worm']
 
 
 def normalise(x):
@@ -73,9 +69,11 @@ def normalise(x):
 def load_dataset(test_set):
     (x_train_loaded, y_train_loaded), (x_test_loaded, y_test_loaded) = get_dataset(test_set)
     num_classes = get_num_classes(test_set)
+
     # normalisation
     x_train_norm = normalise(x_train_loaded)
     x_test = normalise(x_test_loaded)
+
     # make validation set
     x_train, x_validation, y_train_to_categorical, y_validation_to_categorical = train_test_split(x_train_norm,
                                                                                                   y_train_loaded,
@@ -85,6 +83,7 @@ def load_dataset(test_set):
     y_train = keras.utils.to_categorical(y_train_to_categorical, num_classes)
     y_test = keras.utils.to_categorical(y_test_loaded, num_classes)
     y_validation = keras.utils.to_categorical(y_validation_to_categorical, num_classes)
+
     return x_train, y_train, x_validation, y_validation, x_test, y_test
 
 
@@ -92,9 +91,11 @@ def load_dataset_generator(test_set):
     (x_train, y_train), (x_test, y_test) = get_dataset(test_set)
     num_classes = get_num_classes(test_set)
 
+    # normalisation
     x_train = normalise(x_train)
     x_test = normalise(x_test)
 
+    # One hot encode
     y_train = keras.utils.to_categorical(y_train, num_classes)
     y_test = keras.utils.to_categorical(y_test, num_classes)
 
@@ -110,7 +111,6 @@ def load_dataset_generator(test_set):
         horizontal_flip=True,
         vertical_flip=False,
         validation_split=VALIDATION_SPLIT)
-
     datagen.fit(x_train)
 
     train_generator = datagen.flow(x_train, y_train, subset='training', batch_size=BATCH_SIZE)
@@ -175,20 +175,19 @@ def set_memory_usage():
 def main():
     set_memory_usage()
 
-    model = make_model_3_block(SET)
+    model = make_model_3_block(CHOSEN_SET)
     model.compile(loss='categorical_crossentropy',  # we train 10-way classification
                   optimizer=keras.optimizers.adamax(lr=INIT_LR),  # for SGD
                   metrics=['accuracy'])  # report accuracy during training
 
     if USE_GENERATOR:
-        x_train, y_train, x_test, y_test, train_gen, valid_gen = load_dataset_generator(SET)
+        x_train, y_train, x_test, y_test, train_gen, valid_gen = load_dataset_generator(CHOSEN_SET)
         history = model.fit_generator(generator=train_gen, validation_data=valid_gen,
                                       steps_per_epoch=len(train_gen), validation_steps=len(valid_gen),
                                       epochs=EPOCHS, shuffle=True, verbose=2)
 
     else:
-        x_train, y_train, x_validation, y_validation, x_test, y_test = load_dataset(SET)
-
+        x_train, y_train, x_validation, y_validation, x_test, y_test = load_dataset(CHOSEN_SET)
         history = model.fit(
             x_train, y_train,  # prepared data
             batch_size=BATCH_SIZE,
@@ -202,11 +201,12 @@ def main():
     print("Accuracy = %.2f " % (acc * 100.0) + "%")
     prediction = model.predict_classes(x_test, batch_size=BATCH_SIZE)
 
-    show_confusion_matrix(prediction, np.argmax(y_test, axis=1), get_labels(SET), SET)
-    summarize_diagnostics(history)
+    # Show plots
+    show_confusion_matrix(prediction, np.argmax(y_test, axis=1), get_labels(CHOSEN_SET), CHOSEN_SET)
+    show_plots(history)
 
 
-def show_confusion_matrix(y_pred, y_real, target_names,test_set):
+def show_confusion_matrix(y_pred, y_real, target_names, test_set):
     cm = confusion_matrix(y_pred, y_real)
     cmap = plt.get_cmap('Blues')
     if test_set is TestSet.CIFAR10:
@@ -233,7 +233,7 @@ def show_confusion_matrix(y_pred, y_real, target_names,test_set):
     plt.show()
 
 
-def summarize_diagnostics(history):
+def show_plots(history):
     # plot loss
     plt.subplot(211)
     # Cross Entropy Loss
