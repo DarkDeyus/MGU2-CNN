@@ -10,20 +10,12 @@ from sklearn.model_selection import train_test_split
 from sklearn.metrics import confusion_matrix
 from enum import Enum
 import itertools
-
+import Models
+import Optimizers
 
 class TestSet(Enum):
     CIFAR10 = 1
     CIFAR100 = 2
-
-
-CHOSEN_SET = TestSet.CIFAR100
-USE_GENERATOR = True
-VALIDATION_SPLIT = 0.2
-BATCH_SIZE = 32
-EPOCHS = 2
-
-INIT_LR = 1e-3
 
 
 def get_num_classes(test_set):
@@ -42,8 +34,9 @@ def get_dataset(test_set):
 
 def get_labels(test_set):
     if test_set is TestSet.CIFAR10:
-        return ["airplane", "automobile", "bird", "cat", "deer", "dog", "frog", "horse", "ship", "truck"]
-    if test_set is TestSet.CIFAR100:
+        return ["airplane", "automobile", "bird", "cat", "deer",
+                "dog", "frog", "horse", "ship", "truck"]
+    elif test_set is TestSet.CIFAR100:
         return [
             'apple', 'aquarium_fish', 'baby', 'bear', 'beaver', 'bed', 'bee', 'beetle',
             'bicycle', 'bottle', 'bowl', 'boy', 'bridge', 'bus', 'butterfly', 'camel',
@@ -66,7 +59,7 @@ def normalise(x):
     return (x / 255) - 0.5
 
 
-def load_dataset(test_set):
+def load_dataset(test_set, test_size):
     (x_train_loaded, y_train_loaded), (x_test_loaded, y_test_loaded) = get_dataset(test_set)
     num_classes = get_num_classes(test_set)
 
@@ -77,7 +70,7 @@ def load_dataset(test_set):
     # make validation set
     x_train, x_validation, y_train_to_categorical, y_validation_to_categorical = train_test_split(x_train_norm,
                                                                                                   y_train_loaded,
-                                                                                                  test_size=VALIDATION_SPLIT,
+                                                                                                  test_size=test_size,
                                                                                                   stratify=y_train_loaded)
     # One hot encode
     y_train = keras.utils.to_categorical(y_train_to_categorical, num_classes)
@@ -87,7 +80,7 @@ def load_dataset(test_set):
     return x_train, y_train, x_validation, y_validation, x_test, y_test
 
 
-def load_dataset_generator(test_set):
+def load_dataset_generator(test_set, test_size, batch_size):
     (x_train, y_train), (x_test, y_test) = get_dataset(test_set)
     num_classes = get_num_classes(test_set)
 
@@ -110,61 +103,13 @@ def load_dataset_generator(test_set):
         height_shift_range=0.1,
         horizontal_flip=True,
         vertical_flip=False,
-        validation_split=VALIDATION_SPLIT)
+        validation_split=test_size)
     datagen.fit(x_train)
 
-    train_generator = datagen.flow(x_train, y_train, subset='training', batch_size=BATCH_SIZE)
-    valid_generator = datagen.flow(x_train, y_train, subset='validation', batch_size=BATCH_SIZE)
+    train_generator = datagen.flow(x_train, y_train, subset='training', batch_size=batch_size)
+    valid_generator = datagen.flow(x_train, y_train, subset='validation', batch_size=batch_size)
 
     return x_train, y_train, x_test, y_test, train_generator, valid_generator
-
-
-def make_model(test_set):
-    num_classes = get_num_classes(test_set)
-
-    model = Sequential()
-    model.add(Conv2D(16, (3, 3), padding='same', activation='relu', input_shape=(32, 32, 3)))
-    model.add(Conv2D(32, (3, 3), padding='same', activation='relu', input_shape=(32, 32, 3)))
-    model.add(MaxPooling2D(pool_size=(2, 2), strides=None, padding='valid', data_format=None))
-    model.add(Dropout(0.25))
-    model.add(Conv2D(32, (3, 3), padding='same', activation='relu', input_shape=(32, 32, 3)))
-    model.add(Conv2D(64, (3, 3), padding='same', activation='relu', input_shape=(32, 32, 3)))
-    model.add(MaxPooling2D(pool_size=(2, 2), strides=None, padding='valid', data_format=None))
-    model.add(Dropout(0.25))
-    model.add(Flatten())
-    model.add(Dense(256, input_shape=(256,)))
-    model.add(Dense(num_classes))
-    model.add(LeakyReLU(0.1))
-    model.add(Activation('softmax'))
-    return model
-
-
-def make_model_3_block(test_set):
-    num_classes = get_num_classes(test_set)
-
-    model = Sequential()
-    model.add(
-        Conv2D(32, (3, 3), activation='relu', kernel_initializer='he_uniform', padding='same', input_shape=(32, 32, 3)))
-    model.add(Conv2D(32, (3, 3), activation='relu', kernel_initializer='he_uniform', padding='same'))
-    model.add(MaxPooling2D((2, 2)))
-    model.add(Dropout(0.2))
-
-    model.add(Conv2D(64, (3, 3), activation='relu', kernel_initializer='he_uniform', padding='same'))
-    model.add(Conv2D(64, (3, 3), activation='relu', kernel_initializer='he_uniform', padding='same'))
-    model.add(MaxPooling2D((2, 2)))
-    model.add(Dropout(0.2))
-
-    model.add(Conv2D(128, (3, 3), activation='relu', kernel_initializer='he_uniform', padding='same'))
-    model.add(Conv2D(128, (3, 3), activation='relu', kernel_initializer='he_uniform', padding='same'))
-    model.add(MaxPooling2D((2, 2)))
-    model.add(Dropout(0.2))
-
-    model.add(Flatten())
-    model.add(Dense(128, activation='relu', kernel_initializer='he_uniform'))
-
-    model.add(Dense(num_classes, activation='softmax'))
-    return model
-
 
 def set_memory_usage():
     gpu_devices = tf.config.experimental.list_physical_devices('GPU')
@@ -172,41 +117,50 @@ def set_memory_usage():
         tf.config.experimental.set_memory_growth(device, True)
 
 
-def main():
-    set_memory_usage()
+# def main():
+#     set_memory_usage()
 
-    model = make_model_3_block(CHOSEN_SET)
-    model.compile(loss='categorical_crossentropy',  # we train 10-way classification
-                  optimizer=keras.optimizers.adamax(lr=INIT_LR),  # for SGD
-                  metrics=['accuracy'])  # report accuracy during training
+#     model = make_model_3_block(CHOSEN_SET)
+#     model.compile(loss='categorical_crossentropy',  # we train 10-way classification
+#                   optimizer=keras.optimizers.adamax(lr=INIT_LR),  # for SGD
+#                   metrics=['accuracy'])  # report accuracy during training
 
-    if USE_GENERATOR:
-        x_train, y_train, x_test, y_test, train_gen, valid_gen = load_dataset_generator(CHOSEN_SET)
-        history = model.fit_generator(generator=train_gen, validation_data=valid_gen,
-                                      steps_per_epoch=len(train_gen), validation_steps=len(valid_gen),
-                                      epochs=EPOCHS, shuffle=True, verbose=2)
+#     if USE_GENERATOR:
+#         x_train, y_train, x_test, y_test, train_gen, valid_gen = load_dataset_generator(CHOSEN_SET)
+#         history = model.fit_generator(generator=train_gen, validation_data=valid_gen,
+#                                       steps_per_epoch=len(train_gen), validation_steps=len(valid_gen),
+#                                       epochs=EPOCHS, shuffle=True, verbose=2)
 
+#     else:
+#         x_train, y_train, x_validation, y_validation, x_test, y_test = load_dataset(CHOSEN_SET)
+#         history = model.fit(
+#             x_train, y_train,  # prepared data
+#             batch_size=BATCH_SIZE,
+#             epochs=EPOCHS,
+#             validation_data=(x_validation, y_validation),  # validation_set
+#             shuffle=True,
+#             verbose=2,
+#             initial_epoch=0)
+
+#     return history
+
+
+def display_results(model, batch_size, history, dataset, use_generator, test_set):
+    if use_generator:
+        _, _, x_test, y_test, _, _ = dataset
     else:
-        x_train, y_train, x_validation, y_validation, x_test, y_test = load_dataset(CHOSEN_SET)
-        history = model.fit(
-            x_train, y_train,  # prepared data
-            batch_size=BATCH_SIZE,
-            epochs=EPOCHS,
-            validation_data=(x_validation, y_validation),  # validation_set
-            shuffle=True,
-            verbose=2,
-            initial_epoch=0)
-
-    _, acc = model.evaluate(x_test, y_test, batch_size=BATCH_SIZE)
+        _, _, _, _, x_test, y_test = dataset
+    _, acc = model.evaluate(x_test, y_test, batch_size=batch_size)
     print("Accuracy = %.2f " % (acc * 100.0) + "%")
-    prediction = model.predict_classes(x_test, batch_size=BATCH_SIZE)
+    prediction = model.predict_classes(x_test, batch_size=batch_size)
 
     # Show plots
-    show_confusion_matrix(prediction, np.argmax(y_test, axis=1), get_labels(CHOSEN_SET), CHOSEN_SET)
+    show_confusion_matrix(prediction, np.argmax(y_test, axis=1), test_set)
     show_plots(history)
 
 
-def show_confusion_matrix(y_pred, y_real, target_names, test_set):
+def show_confusion_matrix(y_pred, y_real, test_set):
+    target_names = get_labels(test_set)
     cm = confusion_matrix(y_pred, y_real)
     cmap = plt.get_cmap('Blues')
     if test_set is TestSet.CIFAR10:
@@ -248,6 +202,41 @@ def show_plots(history):
     plt.plot(history.history['val_accuracy'], color='orange', label='Zbiór walidacyjny')
     plt.legend()
     plt.show()
+
+def calculate_for(batch_size, epochs, optimizer, model, dataset, use_generator):
+    model.compile(loss='categorical_crossentropy',
+                  optimizer=optimizer,
+                  metrics=['accuracy'])
+    if use_generator:
+        x_train, y_train, x_test, y_test, train_gen, valid_gen = dataset
+        history = model.fit_generator(generator=train_gen, validation_data=valid_gen,
+                                      steps_per_epoch=len(train_gen), validation_steps=len(valid_gen),
+                                      epochs=epochs, shuffle=True, verbose=2)
+    else:
+        x_train, y_train, x_validation, y_validation, x_test, y_test = dataset
+        history = model.fit(x_train, y_train,
+                            batch_size=batch_size,
+                            epochs=epochs,
+                            validation_data=(x_validation, y_validation),
+                            shuffle=True,
+                            verbose=2,
+                            initial_epoch=0)
+    return history
+
+def main():
+    #set_memory_usage()
+    init_lr = 1e-3
+    batch_size = 32
+    epochs = 2
+    test_size = 0.2
+    test_set = TestSet.CIFAR10
+    use_generator = True
+    optimizer = Optimizers.OptimizerFactory().adamax_optimizer(init_lr)
+    model = Models.ModelFactory(get_num_classes(test_set)).make_basic_model()
+    dataset = load_dataset_generator(test_set, batch_size, test_size) if use_generator\
+              else load_dataset(test_set, test_size)
+    history = calculate_for(batch_size, epochs, optimizer, model, dataset, use_generator)
+    display_results(model, batch_size, history, dataset, use_generator, test_set)
 
 
 if __name__ == "__main__":
