@@ -58,7 +58,6 @@ def get_labels(test_set):
 def normalise(x):
     return (x / 255) - 0.5
 
-
 def load_dataset(test_set, test_size):
     (x_train_loaded, y_train_loaded), (x_test_loaded, y_test_loaded) = get_dataset(test_set)
     num_classes = get_num_classes(test_set)
@@ -233,7 +232,7 @@ def main():
     use_generator = True
     optimizer = Optimizers.OptimizerFactory().adamax_optimizer(init_lr)
     model = Models.ModelFactory(get_num_classes(test_set)).make_basic_model()
-    dataset = load_dataset_generator(test_set, batch_size, test_size) if use_generator\
+    dataset = load_dataset_generator(test_set, test_size, batch_size) if use_generator\
               else load_dataset(test_set, test_size)
     history = calculate_for(batch_size, epochs, optimizer, model, dataset, use_generator)
     display_results(model, batch_size, history, dataset, use_generator, test_set)

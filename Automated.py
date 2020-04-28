@@ -162,20 +162,20 @@ def main2():
         ("vgg4", "adamax0.001")
     ]
     datsets = [
-        (Main.TestSet.CIFAR10, False),
-        (Main.TestSet.CIFAR10, True),
-        (Main.TestSet.CIFAR100, False),
-        (Main.TestSet.CIFAR100, True)
+        #(Main.TestSet.CIFAR10, False),
+        (Main.TestSet.CIFAR10, True)
+        #(Main.TestSet.CIFAR100, False),
+        #(Main.TestSet.CIFAR100, True)
     ]
     for datase_info in datsets:
         test_set, use_generator = datase_info
-        dataset = Main.load_dataset_generator(test_set, batch_size, test_size)\
+        dataset = Main.load_dataset_generator(test_set, test_size, batch_size)\
                   if use_generator else\
                   Main.load_dataset(test_set, test_size)
         for (model_name, optimizer_name) in considered_models:
-            model = models_dict[model_name]()
-            optimizer = optimizers_dict[optimizer_name]()
             for i in range(retries):
+                model = models_dict[model_name]()
+                optimizer = optimizers_dict[optimizer_name]()
                 i = i + 1
                 run(model, model_name, optimizer, optimizer_name, i,
                     epochs, batch_size, dataset, test_set, use_generator)
